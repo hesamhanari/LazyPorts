@@ -1,0 +1,80 @@
+name: Release
+
+# Publishes prebuilt linux binaries when a version tag (v*) is pushed.
+on:
+  push:
+    tags: ['v*']
+
+# Default to read-only; only the release job below is granted contents: write.
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: build (linux/${{ matrix.goarch }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        goarch: [amd64, arm64]
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
+        with:
+          go-version-file: go.mod
+
+      - name: go vet
+        run: go vet ./...
+        env:
+          GOOS: linux
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: '0'
+
+      - name: Build
+        run: go build -trimpath -ldflags "-s -w" -o "dist/lazyports-linux-${{ matrix.goarch }}" .
+        env:
+          GOOS: linux
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: '0'
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: lazyports-linux-${{ matrix.goarch }}
+          path: dist/lazyports-linux-${{ matrix.goarch }}
+          if-no-files-found: error
+
+  release:
+    name: publish release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # required to create a release and upload assets
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Generate SHA256SUMS
+        working-directory: dist
+        run: |
+          sha256sum lazyports-linux-amd64 lazyports-linux-arm64 > SHA256SUMS
+          sha256sum -c SHA256SUMS
+          ls -l
+
+      - name: Create release and upload assets
+        env:
+          GH_TOKEN: ${{ github.token }}   # short-lived, per-run token; never printed
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$TAG" \
+            dist/lazyports-linux-amd64 \
+            dist/lazyports-linux-arm64 \
+            dist/SHA256SUMS \
+            --title "$TAG" \
+            --generate-notes \
+            --verify-tag

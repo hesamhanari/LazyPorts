@@ -12,6 +12,40 @@
 
 Built with Bubble Tea and Lipgloss.
 
+> **Fork note:** this is a fork of [v9mirza/lazyports](https://github.com/v9mirza/lazyports). All credit for LazyPorts goes to upstream; this fork's only difference is that it publishes prebuilt Linux binaries on its [Releases page](https://github.com/hesamhanari/lazyports/releases).
+
+## Prebuilt binaries (no Go needed)
+
+Prebuilt static Linux binaries (`amd64` and `arm64`) are published on this fork's [Releases page](https://github.com/hesamhanari/lazyports/releases), together with a `SHA256SUMS` file. No Go toolchain is required.
+
+```bash
+# 1. Pick the binary for your CPU (x86_64 -> amd64, aarch64 -> arm64)
+case "$(uname -m)" in
+  x86_64)        ARCH=amd64 ;;
+  aarch64|arm64) ARCH=arm64 ;;
+  *) echo "unsupported architecture: $(uname -m)" >&2; exit 1 ;;
+esac
+
+# 2. Download the binary and the checksum file
+BASE=https://github.com/hesamhanari/lazyports/releases/latest/download
+curl -fsSLO "$BASE/lazyports-linux-$ARCH"
+curl -fsSLO "$BASE/SHA256SUMS"
+
+# 3. Verify the download (must print "lazyports-linux-...: OK")
+sha256sum -c --ignore-missing SHA256SUMS
+
+# 4. Make it executable and install it to /usr/local/bin
+chmod +x "lazyports-linux-$ARCH"
+sudo mv "lazyports-linux-$ARCH" /usr/local/bin/lazyports
+
+# 5. Run it (needs an interactive terminal)
+lazyports
+```
+
+Do not continue if step 3 prints `FAILED` or an error. To install a specific version instead of the latest, replace `latest/download` in `BASE` with `download/<tag>` (for example `download/v0.1.0`).
+
+The [Installation](#installation) section below (Go required) remains available as an alternative.
+
 ## Prerequisites
 
 -   **Go 1.24** or higher (required for installation)
